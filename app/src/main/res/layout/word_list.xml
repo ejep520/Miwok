@@ -6,4 +6,4 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     tools:context=".NumbersActivity"
-    tools:listitem="@layout/list_item"/>
+    tools:listitem="@layout/list_item" />

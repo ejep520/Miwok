@@ -24,18 +24,20 @@ public class WordAdapter extends ArrayAdapter<Word> {
 
     @ColorRes
     private final int mBackgroundColorRes;
-    private MediaPlayer mediaPlayer;
-    private final AudioManager audioManager;
-    private final AudioManager.OnAudioFocusChangeListener afListener = v -> {
+    private MediaPlayer mMediaPlayer;
+    private final AudioManager mAudioManager;
+    @RequiresApi(api=Build.VERSION_CODES.O)
+    private final AudioFocusRequest mAudioFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT).build();
+    private final AudioManager.OnAudioFocusChangeListener mAfListener = v -> {
         switch (v) {
             case AudioManager.AUDIOFOCUS_LOSS:
             case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
             case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
-                mediaPlayer.pause();
-                mediaPlayer.seekTo(0);
+                mMediaPlayer.pause();
+                mMediaPlayer.seekTo(0);
                 break;
             case AudioManager.AUDIOFOCUS_GAIN:
-                mediaPlayer.start();
+                mMediaPlayer.start();
                 break;
             default:
                 break;
@@ -47,9 +49,9 @@ public class WordAdapter extends ArrayAdapter<Word> {
         public void onCompletion(MediaPlayer mp) {
             mp.release();
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-                audioManager.abandonAudioFocus(afListener);
+                mAudioManager.abandonAudioFocus(mAfListener);
             } else {
-                audioManager.abandonAudioFocusRequest(new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT).build());
+                mAudioManager.abandonAudioFocusRequest(mAudioFocusRequest);
             }
         }
     };
@@ -57,14 +59,14 @@ public class WordAdapter extends ArrayAdapter<Word> {
     public WordAdapter(Context context, ArrayList<Word> wordList, @ColorRes int backgroundInt) {
         super(context, 0, wordList);
         mBackgroundColorRes = backgroundInt;
-        audioManager = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+        mAudioManager = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
     }
 
     @Override
     public View getView(int position, View convertView, ViewGroup parent) {
-        Word wordItem = getItem(position);
-        View listItemView;
-        int imageRes;
+        final Word wordItem = getItem(position);
+        final View listItemView;
+        final int imageRes = wordItem.getDrawableResource();
         if (convertView == null) {
             listItemView = LayoutInflater.from(getContext()).inflate(R.layout.list_item, parent, false);
         } else {
@@ -77,26 +79,27 @@ public class WordAdapter extends ArrayAdapter<Word> {
         linearLayout.setBackgroundColor(ContextCompat.getColor(getContext(), mBackgroundColorRes));
         linearLayout.setOnClickListener(v -> {
             int AudioRes = wordItem.getAudioResource();
-            int result = AudioManager.AUDIOFOCUS_REQUEST_FAILED;
+            int result;
             if (AudioRes >= 0) {
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-                    result = audioManager.requestAudioFocus(afListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
+                    result = mAudioManager.requestAudioFocus(mAfListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
                 } else {
-                    result = audioManager.requestAudioFocus(new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT).build());
+                    result = mAudioManager.requestAudioFocus(mAudioFocusRequest);
                 }
+            } else {
+                return;
             }
             Log.v(getContext().getClass().getSimpleName(), "Current word: " + wordItem);
-            mediaPlayer = MediaPlayer.create(getContext(), AudioRes);
-            mediaPlayer.setOnCompletionListener(OnCompletion);
+            mMediaPlayer = MediaPlayer.create(getContext(), AudioRes);
+            mMediaPlayer.setOnCompletionListener(OnCompletion);
             if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-                mediaPlayer.start();
+                mMediaPlayer.start();
             } else {
-                mediaPlayer.release();
+                mMediaPlayer.release();
             }
         });
         engWord.setText(wordItem.getEnglishTranslation());
         miwWord.setText(wordItem.getMiwokTranslation());
-        imageRes = wordItem.getDrawableResource();
         if (imageRes < 0) {
             imageView.setVisibility(View.GONE);
         } else {
